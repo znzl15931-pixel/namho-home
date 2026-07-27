@@ -1,13 +1,13 @@
 /* ==========================================================================
    MAMAPET Smart Pet Feeder Web Application & OLED Engine (app.js)
-   Ultrasonic Food Level Sensor (20% Warning) & PIR Motion Tracker Included
+   Dynamic Schedule Addition & Deletion Supported
    ========================================================================== */
 
 // App State Variables
 const state = {
   todayFeedCount: 0,
-  targetFeedCount: 3,
-  selectedMelody: 1, // 1: Happy, 2: Gentle, 3: Beep
+  targetFeedCount: 3, // Dynamically synced with active schedule count
+  selectedMelody: 1,  // 1: Happy, 2: Gentle, 3: Beep
   isFeeding: false,
   lastResetDay: new Date().getDate(),
 
@@ -21,12 +21,11 @@ const state = {
   isPirActive: false,
   mealStatusStr: 'READY', // 'READY', 'EATING', 'SKIPPED'
   
-  // Array of custom feeding schedules (Schedules #1 ~ #4)
+  // Default 3 Feeding Schedules (4차 급식 기본 제거, 추가/삭제 가능)
   schedules: [
     { id: 1, vpin: 'V3', timeStr: '08:00', startSec: 8 * 3600, enabled: true, triggeredToday: false },
     { id: 2, vpin: 'V7', timeStr: '13:00', startSec: 13 * 3600, enabled: true, triggeredToday: false },
-    { id: 3, vpin: 'V8', timeStr: '19:00', startSec: 19 * 3600, enabled: true, triggeredToday: false },
-    { id: 4, vpin: 'V9', timeStr: '21:00', startSec: 21 * 3600, enabled: false, triggeredToday: false }
+    { id: 3, vpin: 'V8', timeStr: '19:00', startSec: 19 * 3600, enabled: true, triggeredToday: false }
   ]
 };
 
@@ -112,7 +111,7 @@ function initCanvas() {
 function renderOLED() {
   if (!ctx) return;
 
-  // Clear Canvas (OLED Background: Dark Navy/Black)
+  // Clear Canvas
   ctx.fillStyle = '#090e1a';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -161,6 +160,10 @@ function renderOLED() {
 // UI Update Helpers
 // --------------------------------------------------------------------------
 function updateUI() {
+  // Sync target feed count with enabled schedules count
+  const activeCount = state.schedules.filter(s => s.enabled).length;
+  state.targetFeedCount = Math.max(1, activeCount);
+
   // 1. Counter Display (V1)
   const counterDisplay = document.getElementById('v1-counter-display');
   const progressFill = document.getElementById('v1-progress-fill');
@@ -241,7 +244,6 @@ function triggerFeeding() {
   state.isFeeding = true;
   state.todayFeedCount++;
 
-  // Servo Horn Angle Animation (0° ➔ 90°)
   const servoHorn = document.getElementById('servoHorn');
   const servoAngle = document.getElementById('servo-angle');
   const bowlFill = document.getElementById('bowlFill');
@@ -249,13 +251,10 @@ function triggerFeeding() {
   if (servoHorn) servoHorn.style.transform = 'rotate(90deg)';
   if (servoAngle) servoAngle.textContent = '90° (사료 배출 중)';
 
-  // Sound Play
   playMelody(parseInt(state.selectedMelody));
 
-  // Bowl Fill Animation
   if (bowlFill) bowlFill.style.height = '70%';
 
-  // Decrease food level slightly
   if (state.foodPercent > 5) {
     state.foodPercent = Math.max(0, state.foodPercent - 10);
     const slider = document.getElementById('sim-food-slider');
@@ -264,7 +263,6 @@ function triggerFeeding() {
 
   updateUI();
 
-  // Reset Servo after 2 sec
   setTimeout(() => {
     if (servoHorn) servoHorn.style.transform = 'rotate(0deg)';
     if (servoAngle) servoAngle.textContent = '0° (닫힘)';
@@ -274,8 +272,52 @@ function triggerFeeding() {
 }
 
 // --------------------------------------------------------------------------
-// Render Multi-Schedule Slot List
+// Dynamic Schedule Addition & Removal
 // --------------------------------------------------------------------------
+function addSchedule() {
+  if (state.schedules.length >= 6) {
+    alert('최대 6개의 급식 스케줄까지 등록할 수 있습니다.');
+    return;
+  }
+
+  const nextId = state.schedules.length + 1;
+  const defaultTimes = ['08:00', '13:00', '19:00', '21:00', '23:00', '07:00'];
+  const newTimeStr = defaultTimes[nextId - 1] || '12:00';
+  const parts = newTimeStr.split(':');
+  const startSec = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60;
+
+  state.schedules.push({
+    id: nextId,
+    vpin: `V${nextId + 2}`,
+    timeStr: newTimeStr,
+    startSec: startSec,
+    enabled: true,
+    triggeredToday: false
+  });
+
+  reindexSchedules();
+  renderScheduleList();
+  updateUI();
+}
+
+function removeSchedule(index) {
+  if (state.schedules.length <= 1) {
+    alert('최소 1개 이상의 급식 스케줄이 필요합니다.');
+    return;
+  }
+
+  state.schedules.splice(index, 1);
+  reindexSchedules();
+  renderScheduleList();
+  updateUI();
+}
+
+function reindexSchedules() {
+  state.schedules.forEach((slot, idx) => {
+    slot.id = idx + 1;
+  });
+}
+
 function renderScheduleList() {
   const container = document.getElementById('sched-slots-container');
   if (!container) return;
@@ -283,24 +325,29 @@ function renderScheduleList() {
   container.innerHTML = '';
 
   state.schedules.forEach((slot, index) => {
-    const isVisible = index < state.targetFeedCount;
     const item = document.createElement('div');
-    item.className = `sched-item ${slot.enabled ? 'enabled' : 'disabled'} ${!isVisible ? 'hidden-slot' : ''}`;
+    item.className = `sched-item ${slot.enabled ? 'enabled' : 'disabled'}`;
 
     item.innerHTML = `
       <div class="sched-info">
-        <span class="slot-name">${slot.id}차 급식 (V${slot.vpin.replace('V', '')})</span>
+        <span class="slot-name">${slot.id}차 급식</span>
         <input type="time" class="sched-time-input" value="${slot.timeStr}" ${!slot.enabled ? 'disabled' : ''}>
       </div>
-      <label class="switch">
-        <input type="checkbox" ${slot.enabled ? 'checked' : ''}>
-        <span class="slider round"></span>
-      </label>
+      <div class="sched-actions">
+        <label class="switch">
+          <input type="checkbox" ${slot.enabled ? 'checked' : ''}>
+          <span class="slider round"></span>
+        </label>
+        <button class="btn-delete-sched" title="스케줄 삭제">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </div>
     `;
 
     // Events
     const timeInput = item.querySelector('.sched-time-input');
     const toggle = item.querySelector('input[type="checkbox"]');
+    const btnDelete = item.querySelector('.btn-delete-sched');
 
     timeInput.addEventListener('change', (e) => {
       slot.timeStr = e.target.value;
@@ -311,7 +358,12 @@ function renderScheduleList() {
     toggle.addEventListener('change', (e) => {
       slot.enabled = e.target.checked;
       timeInput.disabled = !slot.enabled;
-      item.className = `sched-item ${slot.enabled ? 'enabled' : 'disabled'} ${!isVisible ? 'hidden-slot' : ''}`;
+      item.className = `sched-item ${slot.enabled ? 'enabled' : 'disabled'}`;
+      updateUI();
+    });
+
+    btnDelete.addEventListener('click', () => {
+      removeSchedule(index);
     });
 
     container.appendChild(item);
@@ -342,6 +394,12 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchSourceCode();
   updateUI();
 
+  // Add Schedule Button Event
+  const btnAddSchedule = document.getElementById('btn-add-schedule');
+  if (btnAddSchedule) {
+    btnAddSchedule.addEventListener('click', addSchedule);
+  }
+
   // Manual Feed Button (V2)
   const btnManualFeed = document.getElementById('btn-manual-feed');
   if (btnManualFeed) {
@@ -357,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // PIR Pet Eat Button (5분 이상 움직임 감지 ➔ 식사 중)
+  // PIR Pet Eat Button
   const btnSimPetEat = document.getElementById('btn-sim-pet-eat');
   if (btnSimPetEat) {
     btnSimPetEat.addEventListener('click', () => {
@@ -372,24 +430,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // PIR Pet Skip Button (1시간 무반응 ➔ 미섭취)
+  // PIR Pet Skip Button
   const btnSimPetSkip = document.getElementById('btn-sim-pet-skip');
   if (btnSimPetSkip) {
     btnSimPetSkip.addEventListener('click', () => {
       state.isPirActive = false;
       state.mealStatusStr = 'SKIPPED (미섭취/1시간 무반응)';
-      updateUI();
-    });
-  }
-
-  // Target Count Slider (V5)
-  const targetSlider = document.getElementById('target-count-slider');
-  const targetText = document.getElementById('target-count-text');
-  if (targetSlider) {
-    targetSlider.addEventListener('input', (e) => {
-      state.targetFeedCount = parseInt(e.target.value);
-      if (targetText) targetText.textContent = `${state.targetFeedCount} 회`;
-      renderScheduleList();
       updateUI();
     });
   }

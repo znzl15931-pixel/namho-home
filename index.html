@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MAMAPET - ESP32 스마트 펫 급식기 대시보드 (초음파 사료 잔량 & PIR 감지)</title>
-  <meta name="description" content="ESP32 마이크로컨트롤러, SSD1306 OLED, 서보모터, PIR 센서, HC-SR04 초음파 사료 잔량 센서 및 Blynk IoT 연동 스마트 펫 급식기 대시보드">
+  <title>MAMAPET - ESP32 스마트 펫 급식기 대시보드 (동적 급식 스케줄 추가/삭제 기능)</title>
+  <meta name="description" content="ESP32 마이크로컨트롤러, SSD1306 OLED, 서보모터, PIR 센서, HC-SR04 초음파 사료 잔량 센서 및 동적 스케줄 추가/삭제 기능 커스텀 스마트 펫 급식기 대시보드">
   <!-- Google Fonts & Font Awesome Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +20,7 @@
       <div class="logo-icon"><i class="fa-solid fa-cat"></i></div>
       <div>
         <h1>MAMAPET <span>Smart Feeder IoT</span></h1>
-        <p class="subtitle">ESP32 + Blynk IoT + 초음파 사료 잔량 센서 + PIR 식사 감지 시스템</p>
+        <p class="subtitle">ESP32 + Blynk IoT + 동적 급식 스케줄 설정 + 초음파 사료 잔량 & PIR 감지</p>
       </div>
     </div>
     <div class="header-status">
@@ -115,7 +115,7 @@
             <span class="signal"><i class="fa-solid fa-wifi"></i> 100%</span>
           </div>
 
-          <!-- [신규] Widget V12 & V13: 초음파 사료 잔량 및 20% 부족 경고 알림 -->
+          <!-- Widget V12 & V13: 초음파 사료 잔량 및 20% 부족 경고 알림 -->
           <div class="blynk-widget food-level-widget" id="food-warning-widget">
             <div class="widget-label">
               <i class="fa-solid fa-box-open"></i> 뚜껑 초음파 센서 사료 잔량 (V12 & V13)
@@ -130,7 +130,6 @@
                 <span id="v13-warning-text">사료량 양호</span>
               </div>
             </div>
-            <!-- 초음파 사료 슬라이더 시뮬레이션 -->
             <div class="sim-slider-row">
               <label for="sim-food-slider">사료량 조절 테스트 (초음파 거리):</label>
               <input type="range" id="sim-food-slider" min="0" max="100" value="80">
@@ -151,6 +150,19 @@
             </div>
           </div>
 
+          <!-- [개선된 동적 스케줄러] 급식 시간 추가/삭제 커스텀 스케줄러 -->
+          <div class="blynk-widget scheduler-widget">
+            <div class="widget-label-row">
+              <div class="widget-label">
+                <i class="fa-regular fa-clock"></i> 급식 스케줄러 (원하는 시간 자유 추가/삭제)
+              </div>
+              <button class="btn-add-schedule" id="btn-add-schedule">
+                <i class="fa-solid fa-plus"></i> 스케줄 추가
+              </button>
+            </div>
+            <div class="multi-sched-list" id="sched-slots-container"></div>
+          </div>
+
           <!-- Widget V10 & V11: PIR Motion & Eating Monitoring -->
           <div class="blynk-widget pir-widget">
             <div class="widget-label">
@@ -167,7 +179,6 @@
               </div>
             </div>
 
-            <!-- PIR Motion Simulation Test Controls -->
             <div class="pir-sim-controls">
               <button class="btn-pir-trigger" id="btn-sim-pet-eat">
                 <i class="fa-solid fa-paw"></i> 🐾 5분 이상 감지 (식사 중 변경)
@@ -176,25 +187,6 @@
                 <i class="fa-solid fa-triangle-exclamation"></i> ⚠️ 1시간 무반응 (미섭취 설정)
               </button>
             </div>
-          </div>
-
-          <!-- Widget V5: Target Count Config -->
-          <div class="blynk-widget target-widget">
-            <div class="widget-label">
-              <i class="fa-solid fa-bullseye"></i> 하루 목표 급식 횟수 설정 (Datastream V5)
-            </div>
-            <div class="slider-row">
-              <input type="range" id="target-count-slider" min="1" max="4" value="3">
-              <span class="target-val-label" id="target-count-text">3 회</span>
-            </div>
-          </div>
-
-          <!-- Multi-Schedule Slots (V3, V7, V8, V9) -->
-          <div class="blynk-widget scheduler-widget">
-            <div class="widget-label">
-              <i class="fa-regular fa-clock"></i> 개별 급식 시간 지정 스케줄러 (V3, V7, V8, V9)
-            </div>
-            <div class="multi-sched-list" id="sched-slots-container"></div>
           </div>
 
           <!-- Widget V2: Manual Feed Trigger Button -->
@@ -249,7 +241,7 @@
     <!-- Tab 1: ESP32 Code Viewer -->
     <div class="tab-content active" id="tab-code">
       <div class="code-header">
-        <span>파일: <code>MAMAPET_ESP32.ino</code> (초음파 사료 잔량 & PIR 감지)</span>
+        <span>파일: <code>MAMAPET_ESP32.ino</code> (동적 급식 스케줄 추가/삭제)</span>
         <button class="btn-copy" id="btn-copy-code"><i class="fa-regular fa-copy"></i> 전체 코드 복사</button>
       </div>
       <pre><code id="code-display">/* Loading Source Code... */</code></pre>
@@ -295,7 +287,7 @@
                 <td>급식구 앞 5분 감지(식사 중) / 1시간 무반응(미섭취)</td>
               </tr>
               <tr>
-                <td><strong>[신규] 초음파 센서 (HC-SR04)</strong></td>
+                <td><strong>초음파 센서 (HC-SR04)</strong></td>
                 <td><code class="pin-badge">TRIG: 5</code>, <code class="pin-badge">ECHO: 4</code></td>
                 <td>5V / Digital I/O</td>
                 <td>뚜껑 안쪽 하향 설치 (20% 이하 시 사료 부족 알림)</td>
@@ -330,9 +322,9 @@
               </tr>
               <tr>
                 <td><code class="pin-badge">V3, V7~V9</code></td>
-                <td>Schedules #1~#4</td>
+                <td>Schedules (동적)</td>
                 <td>Time Input</td>
-                <td>1차~4차 급식 시간 개별 지정</td>
+                <td>원하는 스케줄 자유 추가/삭제 지원</td>
               </tr>
               <tr>
                 <td><code class="pin-badge">V10</code></td>
