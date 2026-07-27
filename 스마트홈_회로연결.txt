@@ -1,0 +1,83 @@
+esp32 스마트홈 MicroPython 하드웨어 회로 연결 명세서
+
+**피지컬 시스템 개요**:
+이 피지컬 시스템은 ESP32 보드를 중심으로 TTP 터치 센서, RGB LED, CDS 조도 센서, 서보 모터, DHT11 온습도 센서, 피에조 부저, HD44780 I2C LCD, OLED 디스플레이를 활용하는 스마트 홈 자동화 및 수동 제어 교육용 키트입니다.
+
+**ESP32 기본 전원 스펙**:
+- 보드 모델: ESP32 DEVKIT V1 (30핀 사양)
+- 작동 전원: 3.3V / 5V
+- 신호 전압: 3.3V
+
+**각 하드웨어 컴포넌트별 핀 맵 구성**:
+
+# 1. TTP 정전식 터치 센서 (4채널)
+- 모델: TTP223 4-Ch Capacitive Touch Sensor Module
+- 입출력: 디지털 입력 (내부 풀다운 설정)
+- 동작 특징: 터치 감지 시 해당 GPIO 핀으로 HIGH(3.3V) 신호 발생, 미감지 시 LOW(0V)
+- 핀 매핑:
+  - D33 (GPIO33) -> 터치 센서 OUT1 (Touch Pin 1)
+  - D32 (GPIO32) -> 터치 센서 OUT2 (Touch Pin 2)
+  - D35 (GPIO35) -> 터치 센서 OUT3 (Touch Pin 3)
+  - D34 (GPIO34) -> 터치 센서 OUT4 (Touch Pin 4)
+  - VCC -> ESP32 3.3V
+  - GND -> ESP32 GND
+
+# 2. RGB LED (1개)
+- 모델: 공통 캐소드(Common Cathode) 타입 3색 RGB LED
+- 입출력: 디지털 출력 (밝기 및 색상 조정을 위한 PWM 신호 활용 가능)
+- 핀 매핑:
+  - D25 (GPIO25) -> RGB Red 핀
+  - D26 (GPIO26) -> RGB Green 핀
+  - D27 (GPIO27) -> RGB Blue 핀
+  - GND -> ESP32 GND
+
+# 3. CDS 조도 센서
+- 모델: 황화카드뮴(CdS) 광도전 셀 센서 (전압 분배 회로 구성)
+- 입출력: 아날로그 입력 (ADC)
+- 동작 특징: 주변이 어두워지면 저항이 커져 아날로그 전압값이 상승 (ADC1 채널 0 사용)
+- 핀 매핑:
+  - D36 (GPIO36 / VP) -> 조도 신호선 (아날로그 전압 측정)
+  - VCC -> ESP32 3.3V
+  - GND -> ESP32 GND
+
+# 4. 서보 모터 (창문/블라인드 제어용)
+- 모델: SG90 Micro Servo Motor
+- 입출력: PWM 제어 출력
+- 주의사항: 서보 모터 기동 전류가 크므로, 전류 불안정 시 외부 5V 전원을 연결하고 GND를 공유할 것
+- 핀 매핑:
+  - D13 (GPIO13) -> 서보 제어 신호선 (PWM 출력)
+  - VCC -> ESP32 3.3V (또는 외부 5V 전원)
+  - GND -> ESP32 GND
+
+# 5. 온습도 센서 (DHT11)
+- 모델: DHT11 Digital Humidity and Temperature Sensor Module
+- 입출력: 원와이어(1-Wire) 디지털 통신
+- 핀 매핑:
+  - D14 (GPIO14) -> DHT11 데이터 신호선 (OUT)
+  - VCC -> ESP32 3.3V
+  - GND -> ESP32 GND
+
+# 6. 피에조 부저
+- 모델: 액티브/패시브 피에조 부저 (주파수 톤 연주용)
+- 입출력: PWM 주파수 출력 (톤 연주)
+- 핀 매핑:
+  - D23 (GPIO23) -> 부저 + 극 (PWM 신호선)
+  - GND -> 부저 - 극 (GND)
+
+# 7. HD44780 I2C LCD (16x2 화면)
+- 모델: HD44780 16x2 Character LCD with PCF8574 I2C Adapter Module
+- 통신 규격: I2C (SoftI2C 주소: 0x27)
+- 핀 매핑:
+  - D21 (GPIO21) -> LCD SDA (데이터 선)
+  - D22 (GPIO22) -> LCD SCL (클럭 선)
+  - VCC -> ESP32 3.3V (또는 외부 5V 전원)
+  - GND -> ESP32 GND
+
+# 8. I2C OLED 디스플레이 (128x64)
+- 모델: SSD1306 128x64 0.96인치 I2C OLED 디스플레이
+- 통신 규격: I2C (SoftI2C 공유)
+- 핀 매핑:
+  - D21 (GPIO21) -> OLED SDA (데이터 선 공유)
+  - D22 (GPIO22) -> OLED SCL (클럭 선 공유)
+  - VCC -> ESP32 3.3V
+  - GND -> ESP32 GND
