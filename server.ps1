@@ -1,9 +1,18 @@
-# Simple Native PowerShell HTTP Web Server for Localhost
 $port = 8000
 $listener = New-Object System.Net.HttpListener
+$listener.Prefixes.Add("http://127.0.0.1:$port/")
 $listener.Prefixes.Add("http://localhost:$port/")
 $listener.Start()
-Write-Host "🚀 Local Server is running at http://localhost:$port/"
+Write-Host "HTTP Server running on http://127.0.0.1:$port/"
+
+$mimeMapping = @{
+    ".html" = "text/html; charset=utf-8"
+    ".css"  = "text/css; charset=utf-8"
+    ".js"   = "application/javascript; charset=utf-8"
+    ".json" = "application/json; charset=utf-8"
+    ".png"  = "image/png"
+    ".jpg"  = "image/jpeg"
+}
 
 try {
     while ($listener.IsListening) {
@@ -11,23 +20,20 @@ try {
         $request = $context.Request
         $response = $context.Response
 
-        $localPath = $request.Url.LocalPath
-        if ($localPath -eq '/') {
-            $localPath = '/index.html'
-        }
+        $urlPath = $request.Url.LocalPath
+        if ($urlPath -eq "/") { $urlPath = "/index.html" }
 
-        $filePath = Join-Path (Get-Location) $localPath.TrimStart('/')
+        $localPath = Join-Path $PSScriptRoot $urlPath.TrimStart('/')
 
-        if (Test-Path $filePath -PathType Leaf) {
-            $bytes = [System.IO.File]::ReadAllBytes($filePath)
+        if (Test-Path $localPath -PathType Leaf) {
+            $ext = [System.IO.Path]::GetExtension($localPath).ToLower()
+            if ($mimeMapping.ContainsKey($ext)) {
+                $response.ContentType = $mimeMapping[$ext]
+            } else {
+                $response.ContentType = "application/octet-stream"
+            }
+            $bytes = [System.IO.File]::ReadAllBytes($localPath)
             $response.ContentLength64 = $bytes.Length
-            
-            if ($filePath.EndsWith('.html')) { $response.ContentType = 'text/html; charset=utf-8' }
-            elseif ($filePath.EndsWith('.css')) { $response.ContentType = 'text/css; charset=utf-8' }
-            elseif ($filePath.EndsWith('.js')) { $response.ContentType = 'application/javascript; charset=utf-8' }
-            elseif ($filePath.EndsWith('.pbm')) { $response.ContentType = 'image/x-portable-bitmap' }
-            elseif ($filePath.EndsWith('.png')) { $response.ContentType = 'image/png' }
-            
             $response.OutputStream.Write($bytes, 0, $bytes.Length)
         } else {
             $response.StatusCode = 404
@@ -37,6 +43,8 @@ try {
         }
         $response.Close()
     }
+} catch {
+    Write-Host $_
 } finally {
     $listener.Stop()
 }
