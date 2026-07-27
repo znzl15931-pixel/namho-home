@@ -1035,3 +1035,109 @@ pre {
   color: var(--text-dim);
   font-size: 13px;
 }
+
+/* Ultrasonic Food Level Widget & Warning Banner */
+.food-level-widget {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.food-level-row {
+  display: flex;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.food-gauge-box {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.gauge-pct {
+  font-size: 24px;
+  font-weight: 800;
+  color: #38bdf8;
+  font-family: var(--font-code);
+}
+
+.gauge-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.warning-banner-box {
+  flex: 2;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #4ade80;
+  font-size: 13px;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+.warning-banner-box.warning-active {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #f87171;
+  animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.sim-slider-row {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.food-meter-bar {
+  width: 12px;
+  height: 60px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+  position: absolute;
+  right: 12px;
+  top: 12px;
+}
+
+.food-fill-level {
+  width: 100%;
+  background: linear-gradient(180deg, #38bdf8, #3b82f6);
+  position: absolute;
+  bottom: 0;
+  transition: height 0.4s ease-out;
+}
+
+.food-pct-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #38bdf8;
+  font-family: var(--font-code);
+  margin-top: 4px;
+}
+

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MAMAPET - ESP32 & Blynk IoT 스마트 펫 급식기 대시보드</title>
-  <meta name="description" content="ESP32 마이크로컨트롤러, SSD1306 OLED 디스플레이, 서보모터, PIR 센서 및 Blynk IoT 연동 스마트 펫 급식기(MAMAPET) 제어 프로그램 및 실시간 웹 시뮬레이터">
+  <title>MAMAPET - ESP32 스마트 펫 급식기 대시보드 (초음파 사료 잔량 & PIR 감지)</title>
+  <meta name="description" content="ESP32 마이크로컨트롤러, SSD1306 OLED, 서보모터, PIR 센서, HC-SR04 초음파 사료 잔량 센서 및 Blynk IoT 연동 스마트 펫 급식기 대시보드">
   <!-- Google Fonts & Font Awesome Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,36 +17,26 @@
   <!-- Top Navigation Header -->
   <header class="app-header">
     <div class="brand">
-      <div class="logo-icon">
-        <i class="fa-solid fa-cat"></i>
-      </div>
-      <div class="brand-text">
-        <h1>MAMAPET <span>Smart Feeder</span></h1>
-        <p class="subtitle">ESP32 & Blynk IoT Control Center (PIR Motion Meal Detection)</p>
+      <div class="logo-icon"><i class="fa-solid fa-cat"></i></div>
+      <div>
+        <h1>MAMAPET <span>Smart Feeder IoT</span></h1>
+        <p class="subtitle">ESP32 + Blynk IoT + 초음파 사료 잔량 센서 + PIR 식사 감지 시스템</p>
       </div>
     </div>
-    
-    <div class="status-bar">
-      <div class="status-badge connected" id="wifi-badge">
-        <span class="dot"></span> ESP32 WiFi: <strong>Connected</strong>
-      </div>
-      <div class="status-badge blynk-connected" id="blynk-badge">
-        <span class="dot"></span> Blynk IoT: <strong>V1~V11 Active</strong>
-      </div>
-      <div class="time-display" id="header-clock">
-        <i class="fa-regular fa-clock"></i> <span id="realtime-clock">00:00:00</span>
-      </div>
+    <div class="header-status">
+      <div class="status-chip online"><i class="fa-solid fa-signal"></i> ESP32 Connected</div>
+      <div class="status-chip blynk"><i class="fa-solid fa-bolt"></i> Blynk Cloud V13</div>
     </div>
   </header>
 
-  <!-- Main Dashboard Container -->
+  <!-- Main Grid Layout -->
   <main class="dashboard-grid">
 
-    <!-- Column 1: Hardware OLED & Feeder Simulator -->
-    <section class="card hw-section">
+    <!-- Column 1: Hardware Simulator & OLED Screen View -->
+    <section class="card hardware-section">
       <div class="card-header">
-        <h2><i class="fa-solid fa-microchip"></i> ESP32 하드웨어 실시간 시뮬레이터</h2>
-        <span class="badge">Hardware View</span>
+        <h2><i class="fa-solid fa-microchip"></i> ESP32 하드웨어 & OLED 시뮬레이터</h2>
+        <span class="badge esp32-badge">GPIO 21, 22, 18, 19, 27, 5, 4</span>
       </div>
 
       <!-- OLED Display Module Container -->
@@ -66,12 +56,19 @@
 
       <!-- Servo Motor & Food Container Visualizer -->
       <div class="feeder-visualizer">
-        <h3><i class="fa-solid fa-gear"></i> 사료 배출 서보모터 & PIR 식사 감지 센서</h3>
+        <h3><i class="fa-solid fa-gear"></i> 사료 통 초음파 잔량 센서 & 서보모터 시뮬레이터</h3>
         <div class="feeder-stage">
-          <div class="hopper">
+          <!-- Food Hopper with Food Level Ultrasonic Indicator -->
+          <div class="hopper" id="hopper-container">
             <i class="fa-solid fa-wheat-awn hopper-icon"></i>
-            <span class="hopper-label">사료 디스펜서 호퍼</span>
+            <span class="hopper-label">뚜껑 초음파 잔량 센서 (HC-SR04)</span>
+            <!-- Ultrasonic Food Level Meter -->
+            <div class="food-meter-bar">
+              <div class="food-fill-level" id="food-fill-bar" style="height: 80%;"></div>
+            </div>
+            <span class="food-pct-badge" id="food-pct-text">80% (충분)</span>
           </div>
+
           <!-- Servo Arm -->
           <div class="servo-arm-container">
             <div class="servo-body">
@@ -83,6 +80,7 @@
               <div class="food-particle p3" id="food3"></div>
             </div>
           </div>
+
           <!-- Bowl & PIR Sensor -->
           <div class="pet-bowl">
             <div class="bowl-inner" id="bowlFill"></div>
@@ -98,7 +96,7 @@
 
         <div class="servo-status">
           <span>서보모터 위치: <strong id="servo-angle">0° (닫힘)</strong></span>
-          <span>식사 판별 상태: <strong id="meal-tracker-state" class="badge-status">READY</strong></span>
+          <span>식사 상태: <strong id="meal-tracker-state" class="badge-status">READY</strong></span>
         </div>
       </div>
     </section>
@@ -106,7 +104,7 @@
     <!-- Column 2: Blynk App Virtual Control Panel -->
     <section class="card blynk-section">
       <div class="card-header">
-        <h2><i class="fa-solid fa-mobile-screen-button"></i> Blynk IoT 앱 제어 패널 (PIR 감지 추가)</h2>
+        <h2><i class="fa-solid fa-mobile-screen-button"></i> Blynk IoT 앱 제어 패널</h2>
         <span class="badge blynk-badge">Blynk App View</span>
       </div>
 
@@ -115,6 +113,28 @@
           <div class="phone-topbar">
             <span>MAMAPET Smart Feeder</span>
             <span class="signal"><i class="fa-solid fa-wifi"></i> 100%</span>
+          </div>
+
+          <!-- [신규] Widget V12 & V13: 초음파 사료 잔량 및 20% 부족 경고 알림 -->
+          <div class="blynk-widget food-level-widget" id="food-warning-widget">
+            <div class="widget-label">
+              <i class="fa-solid fa-box-open"></i> 뚜껑 초음파 센서 사료 잔량 (V12 & V13)
+            </div>
+            <div class="food-level-row">
+              <div class="food-gauge-box">
+                <span class="gauge-pct" id="v12-food-pct">80%</span>
+                <span class="gauge-sub">현재 남은 사료량</span>
+              </div>
+              <div class="warning-banner-box" id="v13-warning-box">
+                <i class="fa-solid fa-circle-check" id="v13-warning-icon"></i>
+                <span id="v13-warning-text">사료량 양호</span>
+              </div>
+            </div>
+            <!-- 초음파 사료 슬라이더 시뮬레이션 -->
+            <div class="sim-slider-row">
+              <label for="sim-food-slider">사료량 조절 테스트 (초음파 거리):</label>
+              <input type="range" id="sim-food-slider" min="0" max="100" value="80">
+            </div>
           </div>
 
           <!-- Widget V1: Feed Counter Display -->
@@ -131,14 +151,14 @@
             </div>
           </div>
 
-          <!-- Widget V10 & V11: PIR Meal Tracking & Motion Indicator -->
+          <!-- Widget V10 & V11: PIR Motion & Eating Monitoring -->
           <div class="blynk-widget pir-widget">
             <div class="widget-label">
-              <i class="fa-solid fa-shield-cat"></i> PIR 식사 감지 모니터 (V10 & V11)
+              <i class="fa-solid fa-shield-cat"></i> PIR 감지 활동 모니터링 (V10 & V11)
             </div>
             <div class="pir-status-row">
               <div class="meal-result-box" id="v10-meal-box">
-                <span class="box-title">식사 상태 (V10)</span>
+                <span class="box-title">식사 판별 상태 (V10)</span>
                 <span class="box-value" id="v10-status-text">READY</span>
               </div>
               <div class="pir-led-box">
@@ -150,10 +170,10 @@
             <!-- PIR Motion Simulation Test Controls -->
             <div class="pir-sim-controls">
               <button class="btn-pir-trigger" id="btn-sim-pet-eat">
-                <i class="fa-solid fa-paw"></i> 🐾 밥 먹으러 오기 (움직임 15초 감지 ➔ 식사 완료)
+                <i class="fa-solid fa-paw"></i> 🐾 5분 이상 감지 (식사 중 변경)
               </button>
               <button class="btn-pir-skip" id="btn-sim-pet-skip">
-                <i class="fa-solid fa-triangle-exclamation"></i> ⚠️ 30분 미섭취 타임아웃 (푸시 알림 전송)
+                <i class="fa-solid fa-triangle-exclamation"></i> ⚠️ 1시간 무반응 (미섭취 설정)
               </button>
             </div>
           </div>
@@ -229,7 +249,7 @@
     <!-- Tab 1: ESP32 Code Viewer -->
     <div class="tab-content active" id="tab-code">
       <div class="code-header">
-        <span>파일: <code>MAMAPET_ESP32.ino</code> (PIR Motion & Multi-Schedule)</span>
+        <span>파일: <code>MAMAPET_ESP32.ino</code> (초음파 사료 잔량 & PIR 감지)</span>
         <button class="btn-copy" id="btn-copy-code"><i class="fa-regular fa-copy"></i> 전체 코드 복사</button>
       </div>
       <pre><code id="code-display">/* Loading Source Code... */</code></pre>
@@ -272,7 +292,13 @@
                 <td><strong>PIR 감지 센서</strong></td>
                 <td><code class="pin-badge">IN: GPIO 27</code></td>
                 <td>3.3V ~ 5V / Digital IN</td>
-                <td>급식구 앞 반려동물 식사 움직임 감지</td>
+                <td>급식구 앞 5분 감지(식사 중) / 1시간 무반응(미섭취)</td>
+              </tr>
+              <tr>
+                <td><strong>[신규] 초음파 센서 (HC-SR04)</strong></td>
+                <td><code class="pin-badge">TRIG: 5</code>, <code class="pin-badge">ECHO: 4</code></td>
+                <td>5V / Digital I/O</td>
+                <td>뚜껑 안쪽 하향 설치 (20% 이하 시 사료 부족 알림)</td>
               </tr>
             </tbody>
           </table>
@@ -312,13 +338,25 @@
                 <td><code class="pin-badge">V10</code></td>
                 <td>Meal Status</td>
                 <td>String</td>
-                <td>식사 상태 ("ATE", "SKIPPED", "WATCHING")</td>
+                <td>식사 상태 ("EATING", "SKIPPED", "WATCHING")</td>
               </tr>
               <tr>
                 <td><code class="pin-badge">V11</code></td>
                 <td>PIR Motion Indicator</td>
                 <td>Integer (0/1)</td>
                 <td>PIR 실시간 움직임 LED 표시</td>
+              </tr>
+              <tr>
+                <td><code class="pin-badge">V12</code></td>
+                <td>Food Level Percent</td>
+                <td>Integer (0~100)</td>
+                <td>초음파 센서 사료 잔량 퍼센트</td>
+              </tr>
+              <tr>
+                <td><code class="pin-badge">V13</code></td>
+                <td>Food Low Warning</td>
+                <td>String</td>
+                <td>20% 이하 사료 채움 경고 알림</td>
               </tr>
             </tbody>
           </table>
@@ -329,7 +367,7 @@
 
   <!-- Footer -->
   <footer class="app-footer">
-    <p>MAMAPET Smart Pet Feeder IoT System &copy; 2026 Powered by ESP32, Blynk IoT, and PIR Sensor</p>
+    <p>MAMAPET Smart Pet Feeder IoT System &copy; 2026 Powered by ESP32, Blynk IoT, PIR Sensor & Ultrasonic Sensor</p>
   </footer>
 
   <script src="app.js"></script>
