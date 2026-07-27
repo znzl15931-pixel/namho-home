@@ -538,14 +538,17 @@ document.addEventListener('DOMContentLoaded', () => {
       state.continuousMotionSec = 0;
       updateUI();
 
+      // Send Web BLE Command to physical ESP32 OLED screen!
+      sendBLECommand('SIM:EAT');
+
       state.motionTimerInterval = setInterval(() => {
         state.continuousMotionSec += 15; // Speed up simulation by 15s steps
         if (state.continuousMotionSec >= 300) {
-          state.mealStatusStr = 'EATING (식사 중)';
+          state.mealStatusStr = 'ATE (식사 완료)';
           clearInterval(state.motionTimerInterval);
           state.isPirActive = false;
         } else {
-          state.mealStatusStr = `${state.continuousMotionSec}s/300s`;
+          state.mealStatusStr = `EATING(${state.continuousMotionSec}s/300s)`;
         }
         updateUI();
       }, 500);
@@ -560,6 +563,9 @@ document.addEventListener('DOMContentLoaded', () => {
       state.isPirActive = false;
       state.mealStatusStr = 'SKIPPED (미섭취/1시간 무반응)';
       updateUI();
+
+      // Send Web BLE Command to physical ESP32 OLED screen!
+      sendBLECommand('SIM:SKIP');
     });
   }
 
