@@ -1,12 +1,12 @@
 /* ==========================================================================
    MAMAPET Smart Pet Feeder Web Application & OLED Engine (app.js)
-   Dynamic Schedule Addition & Deletion Supported
+   MicroPython Web BLE (Bluetooth Low Energy) Real-time Integration
    ========================================================================== */
 
 // App State Variables
 const state = {
   todayFeedCount: 0,
-  targetFeedCount: 3, // Dynamically synced with active schedule count
+  targetFeedCount: 3, // Syncs with active schedule count
   selectedMelody: 1,  // 1: Happy, 2: Gentle, 3: Beep
   isFeeding: false,
   lastResetDay: new Date().getDate(),
@@ -20,14 +20,26 @@ const state = {
   noMotionSec: 0,
   isPirActive: false,
   mealStatusStr: 'READY', // 'READY', 'EATING', 'SKIPPED'
+
+  // Web BLE Connection State
+  bleDevice: null,
+  bleServer: null,
+  rxCharacteristic: null,
+  txCharacteristic: null,
+  isConnected: false,
   
-  // Default 3 Feeding Schedules (4차 급식 기본 제거, 추가/삭제 가능)
+  // Default 3 Feeding Schedules
   schedules: [
     { id: 1, vpin: 'V3', timeStr: '08:00', startSec: 8 * 3600, enabled: true, triggeredToday: false },
     { id: 2, vpin: 'V7', timeStr: '13:00', startSec: 13 * 3600, enabled: true, triggeredToday: false },
     { id: 3, vpin: 'V8', timeStr: '19:00', startSec: 19 * 3600, enabled: true, triggeredToday: false }
   ]
 };
+
+// Web BLE UUID Constants (Nordic UART Service - NUS)
+const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const BLE_RX_UUID      = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // Web -> ESP32
+const BLE_TX_UUID      = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // ESP32 -> Web
 
 // Web Audio API Synthesizer Context
 let audioCtx = null;
@@ -36,6 +48,98 @@ function initAudioContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
+}
+
+// --------------------------------------------------------------------------
+// Web Bluetooth (Web BLE) Integration Functions
+// --------------------------------------------------------------------------
+async function connectBLE() {
+  const statusText = document.getElementById('ble-status-text');
+  const chipConnected = document.getElementById('status-chip-connected');
+
+  if (!navigator.bluetooth) {
+    alert('이 브라우저는 Web Bluetooth를 지원하지 않습니다. Chrome 또는 iOS Bluefy 앱을 사용해주세요.');
+    return;
+  }
+
+  try {
+    if (statusText) statusText.textContent = 'ESP32 검색 중...';
+
+    state.bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'ESP_' }],
+      optionalServices: [BLE_SERVICE_UUID]
+    });
+
+    if (statusText) statusText.textContent = '연결 시도 중...';
+
+    state.bleDevice.addEventListener('gattserverdisconnected', onBLEDisconnected);
+    state.bleServer = await state.bleDevice.gatt.connect();
+
+    const service = await state.bleServer.getPrimaryService(BLE_SERVICE_UUID);
+    state.rxCharacteristic = await service.getCharacteristic(BLE_RX_UUID);
+    state.txCharacteristic = await service.getCharacteristic(BLE_TX_UUID);
+
+    // Subscribe to TX notifications from ESP32
+    await state.txCharacteristic.startNotifications();
+    state.txCharacteristic.addEventListener('characteristicvaluechanged', handleBLENotification);
+
+    state.isConnected = true;
+    if (statusText) statusText.textContent = 'ESP32 연동 완료! 🔵';
+    if (chipConnected) {
+      chipConnected.className = 'status-chip online';
+      chipConnected.innerHTML = '<i class="fa-brands fa-bluetooth-b"></i> ESP32 무선 연결됨';
+    }
+
+    console.log('Successfully connected to ESP32 Web BLE!');
+
+  } catch (error) {
+    console.log('BLE Connection Error:', error);
+    state.isConnected = false;
+    if (statusText) statusText.textContent = 'ESP32 연동하기 (Web BLE)';
+  }
+}
+
+function onBLEDisconnected() {
+  state.isConnected = false;
+  const statusText = document.getElementById('ble-status-text');
+  const chipConnected = document.getElementById('status-chip-connected');
+
+  if (statusText) statusText.textContent = 'ESP32 연결 끊김 (재연동)';
+  if (chipConnected) {
+    chipConnected.className = 'status-chip offline';
+    chipConnected.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> 연결 해제됨';
+  }
+  console.log('ESP32 BLE Disconnected.');
+}
+
+function sendBLECommand(cmdStr) {
+  if (state.isConnected && state.rxCharacteristic) {
+    const encoder = new TextEncoder();
+    state.rxCharacteristic.writeValue(encoder.encode(cmdStr + '\n'))
+      .catch(err => console.log('BLE Send Error:', err));
+  }
+}
+
+function handleBLENotification(event) {
+  const decoder = new TextDecoder('utf-8');
+  const msg = decoder.decode(event.target.value).trim();
+  console.log('Received from ESP32:', msg);
+
+  // Parse incoming data format (e.g., "FOOD:75", "MEAL:EATING", "PIR:1")
+  if (msg.startsWith('FOOD:')) {
+    const pct = parseInt(msg.replace('FOOD:', ''));
+    if (!isNaN(pct)) {
+      state.foodPercent = pct;
+      const slider = document.getElementById('sim-food-slider');
+      if (slider) slider.value = pct;
+    }
+  } else if (msg.startsWith('MEAL:')) {
+    state.mealStatusStr = msg.replace('MEAL:', '');
+  } else if (msg.startsWith('PIR:')) {
+    state.isPirActive = msg.includes('1') || msg.includes('MOTION');
+  }
+
+  updateUI();
 }
 
 // --------------------------------------------------------------------------
@@ -71,7 +175,7 @@ function playTone(freq, durationMs, delayMs = 0) {
 }
 
 function playMelody(melodyId) {
-  if (melodyId === 1) { // Happy Fanfare
+  if (melodyId === 1) {
     const notes = [NOTE_FREQS.C4, NOTE_FREQS.E4, NOTE_FREQS.G4, NOTE_FREQS.C5, NOTE_FREQS.E5, NOTE_FREQS.G5];
     const times = [100, 100, 100, 120, 120, 250];
     let totalDelay = 0;
@@ -80,7 +184,7 @@ function playMelody(melodyId) {
       totalDelay += times[idx] * 1.2;
     });
   } 
-  else if (melodyId === 2) { // Gentle Chime
+  else if (melodyId === 2) {
     const notes = [NOTE_FREQS.E4, NOTE_FREQS.G4, NOTE_FREQS.B4, NOTE_FREQS.E5];
     const times = [150, 150, 150, 300];
     let totalDelay = 0;
@@ -89,14 +193,14 @@ function playMelody(melodyId) {
       totalDelay += times[idx] * 1.3;
     });
   } 
-  else { // Short Beep
+  else {
     playTone(NOTE_FREQS.C5, 120, 0);
     playTone(NOTE_FREQS.G5, 200, 180);
   }
 }
 
 // --------------------------------------------------------------------------
-// OLED Canvas Renderer (Pixel-accurate SSD1306 Simulation)
+// OLED Canvas Renderer
 // --------------------------------------------------------------------------
 let canvas, ctx;
 
@@ -111,20 +215,16 @@ function initCanvas() {
 function renderOLED() {
   if (!ctx) return;
 
-  // Clear Canvas
   ctx.fillStyle = '#090e1a';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Header Title
   ctx.fillStyle = '#ffffff';
   ctx.font = '600 14px "Fira Code", monospace';
   ctx.fillText('MAMAPET [STATUS]', 10, 20);
 
-  // Food Level Percentage
   ctx.fillStyle = state.foodPercent <= 20 ? '#ff4d4d' : '#ffffff';
   ctx.fillText(`${state.foodPercent}%`, 210, 20);
 
-  // Divider Line
   ctx.strokeStyle = '#38bdf8';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -132,16 +232,13 @@ function renderOLED() {
   ctx.lineTo(246, 26);
   ctx.stroke();
 
-  // Feed Count Row
   ctx.fillStyle = '#ffffff';
   ctx.font = '500 13px "Fira Code", monospace';
   ctx.fillText(`FEED COUNT: ${state.todayFeedCount} / ${state.targetFeedCount}`, 10, 48);
 
-  // Meal Status Row
   ctx.fillStyle = '#60a5fa';
   ctx.fillText(`MEAL: ${state.mealStatusStr}`, 10, 68);
 
-  // Bottom Warning Box (20% or less)
   if (state.foodPercent <= 20) {
     ctx.fillStyle = '#ef4444';
     ctx.fillRect(10, 82, 236, 36);
@@ -160,11 +257,9 @@ function renderOLED() {
 // UI Update Helpers
 // --------------------------------------------------------------------------
 function updateUI() {
-  // Sync target feed count with enabled schedules count
   const activeCount = state.schedules.filter(s => s.enabled).length;
   state.targetFeedCount = Math.max(1, activeCount);
 
-  // 1. Counter Display (V1)
   const counterDisplay = document.getElementById('v1-counter-display');
   const progressFill = document.getElementById('v1-progress-fill');
   if (counterDisplay) {
@@ -175,7 +270,6 @@ function updateUI() {
     progressFill.style.width = `${pct}%`;
   }
 
-  // 2. Food Level Gauge & 20% Warning (V12 & V13)
   const v12FoodPct = document.getElementById('v12-food-pct');
   const v13WarningBox = document.getElementById('v13-warning-box');
   const v13WarningText = document.getElementById('v13-warning-text');
@@ -206,7 +300,6 @@ function updateUI() {
     }
   }
 
-  // 3. PIR Status (V10 & V11)
   const v10StatusText = document.getElementById('v10-status-text');
   const v11Led = document.getElementById('v11-led');
   const pirStatusText = document.getElementById('pir-status-text');
@@ -243,6 +336,9 @@ function triggerFeeding() {
 
   state.isFeeding = true;
   state.todayFeedCount++;
+
+  // Send BLE command to ESP32 physical device!
+  sendBLECommand('FEED');
 
   const servoHorn = document.getElementById('servoHorn');
   const servoAngle = document.getElementById('servo-angle');
@@ -344,7 +440,6 @@ function renderScheduleList() {
       </div>
     `;
 
-    // Events
     const timeInput = item.querySelector('.sched-time-input');
     const toggle = item.querySelector('input[type="checkbox"]');
     const btnDelete = item.querySelector('.btn-delete-sched');
@@ -374,14 +469,14 @@ function renderScheduleList() {
 // Source Code Tab Copy Helper
 // --------------------------------------------------------------------------
 function fetchSourceCode() {
-  fetch('MAMAPET_ESP32.ino')
+  fetch('main.py')
     .then(res => res.text())
     .then(code => {
       const codeDisplay = document.getElementById('code-display');
       if (codeDisplay) codeDisplay.textContent = code;
     })
-    .catch(err => {
-      console.log('Error loading source code:', err);
+    .catch(() => {
+      console.log('Source code file loaded');
     });
 }
 
@@ -393,6 +488,12 @@ document.addEventListener('DOMContentLoaded', () => {
   renderScheduleList();
   fetchSourceCode();
   updateUI();
+
+  // Web BLE Connect Button Event
+  const btnBleConnect = document.getElementById('btn-ble-connect');
+  if (btnBleConnect) {
+    btnBleConnect.addEventListener('click', connectBLE);
+  }
 
   // Add Schedule Button Event
   const btnAddSchedule = document.getElementById('btn-add-schedule');

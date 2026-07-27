@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MAMAPET - ESP32 스마트 펫 급식기 대시보드 (동적 급식 스케줄 추가/삭제 기능)</title>
-  <meta name="description" content="ESP32 마이크로컨트롤러, SSD1306 OLED, 서보모터, PIR 센서, HC-SR04 초음파 사료 잔량 센서 및 동적 스케줄 추가/삭제 기능 커스텀 스마트 펫 급식기 대시보드">
+  <title>MAMAPET - ESP32 스마트 펫 급식기 대시보드 (Web BLE 연동)</title>
+  <meta name="description" content="ESP32 마이크로컨트롤러, MicroPython, Web BLE 블루투스 실시간 연동 스마트 펫 급식기 대시보드">
   <!-- Google Fonts & Font Awesome Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,12 +20,14 @@
       <div class="logo-icon"><i class="fa-solid fa-cat"></i></div>
       <div>
         <h1>MAMAPET <span>Smart Feeder IoT</span></h1>
-        <p class="subtitle">ESP32 + Blynk IoT + 동적 급식 스케줄 설정 + 초음파 사료 잔량 & PIR 감지</p>
+        <p class="subtitle">ESP32 MicroPython + Web BLE 무선 연동 + 초음파 사료 잔량 & PIR 감지</p>
       </div>
     </div>
     <div class="header-status">
-      <div class="status-chip online"><i class="fa-solid fa-signal"></i> ESP32 Connected</div>
-      <div class="status-chip blynk"><i class="fa-solid fa-bolt"></i> Blynk Cloud V13</div>
+      <button class="btn-ble-connect" id="btn-ble-connect">
+        <i class="fa-brands fa-bluetooth-b"></i> <span id="ble-status-text">ESP32 연동하기 (Web BLE)</span>
+      </button>
+      <div class="status-chip online" id="status-chip-connected"><i class="fa-solid fa-signal"></i> 시뮬레이터 동작 중</div>
     </div>
   </header>
 
@@ -104,15 +106,15 @@
     <!-- Column 2: Blynk App Virtual Control Panel -->
     <section class="card blynk-section">
       <div class="card-header">
-        <h2><i class="fa-solid fa-mobile-screen-button"></i> Blynk IoT 앱 제어 패널</h2>
-        <span class="badge blynk-badge">Blynk App View</span>
+        <h2><i class="fa-solid fa-mobile-screen-button"></i> 스마트폰 웹 대시보드 제어 패널</h2>
+        <span class="badge blynk-badge">Real-time Web App</span>
       </div>
 
       <div class="blynk-phone-frame">
         <div class="phone-screen">
           <div class="phone-topbar">
             <span>MAMAPET Smart Feeder</span>
-            <span class="signal"><i class="fa-solid fa-wifi"></i> 100%</span>
+            <span class="signal"><i class="fa-solid fa-wifi"></i> Web BLE</span>
           </div>
 
           <!-- Widget V12 & V13: 초음파 사료 잔량 및 20% 부족 경고 알림 -->
@@ -131,7 +133,7 @@
               </div>
             </div>
             <div class="sim-slider-row">
-              <label for="sim-food-slider">사료량 조절 테스트 (초음파 거리):</label>
+              <label for="sim-food-slider">사료량 조절 시뮬레이션 (초음파 거리):</label>
               <input type="range" id="sim-food-slider" min="0" max="100" value="80">
             </div>
           </div>
@@ -150,11 +152,11 @@
             </div>
           </div>
 
-          <!-- [개선된 동적 스케줄러] 급식 시간 추가/삭제 커스텀 스케줄러 -->
+          <!-- 급식 시간 추가/삭제 커스텀 스케줄러 -->
           <div class="blynk-widget scheduler-widget">
             <div class="widget-label-row">
               <div class="widget-label">
-                <i class="fa-regular fa-clock"></i> 급식 스케줄러 (원하는 시간 자유 추가/삭제)
+                <i class="fa-regular fa-clock"></i> 급식 스케줄러 (시간 자유 추가/삭제)
               </div>
               <button class="btn-add-schedule" id="btn-add-schedule">
                 <i class="fa-solid fa-plus"></i> 스케줄 추가
@@ -192,7 +194,7 @@
           <!-- Widget V2: Manual Feed Trigger Button -->
           <div class="blynk-widget button-widget">
             <div class="widget-label">
-              <i class="fa-solid fa-hand-pointer"></i> 수동 원격 급식 (Datastream V2)
+              <i class="fa-solid fa-hand-pointer"></i> 수동 원격 급식 (ESP32 전송)
             </div>
             <button class="btn-feed-now" id="btn-manual-feed">
               <i class="fa-solid fa-bone"></i>
@@ -231,23 +233,23 @@
   <!-- Bottom Detailed Guides & ESP32 Code Section -->
   <section class="card code-section">
     <div class="card-header">
-      <h2><i class="fa-solid fa-code"></i> ESP32 Arduino 소스코드 및 하드웨어 핀맵 가이드</h2>
+      <h2><i class="fa-solid fa-code"></i> ESP32 MicroPython 소스코드 및 하드웨어 핀맵 가이드</h2>
       <div class="tab-buttons">
-        <button class="tab-btn active" data-tab="tab-code"><i class="fa-solid fa-file-code"></i> ESP32 C++ 코드 (MAMAPET_ESP32.ino)</button>
-        <button class="tab-btn" data-tab="tab-wiring"><i class="fa-solid fa-diagram-project"></i> 회로 연결표 & Blynk 가상 핀</button>
+        <button class="tab-btn active" data-tab="tab-code"><i class="fa-brands fa-python"></i> MicroPython 코드 (main.py)</button>
+        <button class="tab-btn" data-tab="tab-wiring"><i class="fa-solid fa-diagram-project"></i> 회로 연결표 & Web BLE 가이드</button>
       </div>
     </div>
 
-    <!-- Tab 1: ESP32 Code Viewer -->
+    <!-- Tab 1: ESP32 MicroPython Code Viewer -->
     <div class="tab-content active" id="tab-code">
       <div class="code-header">
-        <span>파일: <code>MAMAPET_ESP32.ino</code> (동적 급식 스케줄 추가/삭제)</span>
+        <span>파일: <code>main.py</code> (ESP32 MicroPython + Web BLE 무선 연동)</span>
         <button class="btn-copy" id="btn-copy-code"><i class="fa-regular fa-copy"></i> 전체 코드 복사</button>
       </div>
       <pre><code id="code-display">/* Loading Source Code... */</code></pre>
     </div>
 
-    <!-- Tab 2: Hardware Wiring & Blynk Setup Guide -->
+    <!-- Tab 2: Hardware Wiring & Web BLE Guide -->
     <div class="tab-content" id="tab-wiring">
       <div class="info-grid">
         <div class="info-box">
@@ -297,58 +299,35 @@
         </div>
 
         <div class="info-box">
-          <h3><i class="fa-solid fa-cloud"></i> Blynk IoT Cloud Datastream 정의표</h3>
+          <h3><i class="fa-brands fa-bluetooth-b"></i> Web BLE 블루투스 서비스 프로토콜 정의표</h3>
           <table class="guide-table">
             <thead>
               <tr>
-                <th>가상 핀</th>
-                <th>데이터스트림 이름</th>
-                <th>데이터 타입</th>
+                <th>항목</th>
+                <th>UUID / 프로토콜 값</th>
                 <th>설명</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><code class="pin-badge">V1</code></td>
-                <td>Feed Counter Display</td>
-                <td>String</td>
-                <td>카운터 표시 (예: "2/3")</td>
+                <td><strong>BLE 기기명</strong></td>
+                <td><code class="pin-badge">ESP_MAMAPET</code></td>
+                <td>웹 브라우저 스캔 시 자동 검색되는 기기 이름</td>
               </tr>
               <tr>
-                <td><code class="pin-badge">V2</code></td>
-                <td>Manual Feed Button</td>
-                <td>Integer (0/1)</td>
-                <td>수동 급식 원격 버튼</td>
+                <td><strong>Service UUID</strong></td>
+                <td><code class="pin-badge">6e400001-...</code></td>
+                <td>Nordic UART Service (NUS) 표준 블루투스 서비스</td>
               </tr>
               <tr>
-                <td><code class="pin-badge">V3, V7~V9</code></td>
-                <td>Schedules (동적)</td>
-                <td>Time Input</td>
-                <td>원하는 스케줄 자유 추가/삭제 지원</td>
+                <td><strong>Rx (수신)</strong></td>
+                <td><code class="pin-badge">6e400002-...</code></td>
+                <td>웹 사이트 ➔ ESP32 제어 명령 전송 ("FEED", "MELODY:1")</td>
               </tr>
               <tr>
-                <td><code class="pin-badge">V10</code></td>
-                <td>Meal Status</td>
-                <td>String</td>
-                <td>식사 상태 ("EATING", "SKIPPED", "WATCHING")</td>
-              </tr>
-              <tr>
-                <td><code class="pin-badge">V11</code></td>
-                <td>PIR Motion Indicator</td>
-                <td>Integer (0/1)</td>
-                <td>PIR 실시간 움직임 LED 표시</td>
-              </tr>
-              <tr>
-                <td><code class="pin-badge">V12</code></td>
-                <td>Food Level Percent</td>
-                <td>Integer (0~100)</td>
-                <td>초음파 센서 사료 잔량 퍼센트</td>
-              </tr>
-              <tr>
-                <td><code class="pin-badge">V13</code></td>
-                <td>Food Low Warning</td>
-                <td>String</td>
-                <td>20% 이하 사료 채움 경고 알림</td>
+                <td><strong>Tx (송신)</strong></td>
+                <td><code class="pin-badge">6e400003-...</code></td>
+                <td>ESP32 ➔ 웹 사이트 실시간 센서 수치 송신 ("FOOD:80,MEAL:ATE")</td>
               </tr>
             </tbody>
           </table>
@@ -359,7 +338,7 @@
 
   <!-- Footer -->
   <footer class="app-footer">
-    <p>MAMAPET Smart Pet Feeder IoT System &copy; 2026 Powered by ESP32, Blynk IoT, PIR Sensor & Ultrasonic Sensor</p>
+    <p>MAMAPET Smart Pet Feeder IoT System &copy; 2026 Powered by ESP32, MicroPython, Web BLE & Ultrasonic Sensor</p>
   </footer>
 
   <script src="app.js"></script>
