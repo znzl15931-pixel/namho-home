@@ -1,13 +1,13 @@
 /* ==========================================================================
    MAMAPET Smart Pet Feeder Web Application & OLED Engine (app.js)
-   MicroPython Web BLE (Bluetooth Low Energy) Real-time Integration
+   MicroPython Web BLE Real-time Integration + 10-sec Melodies & 5-min Counter
    ========================================================================== */
 
 // App State Variables
 const state = {
   todayFeedCount: 0,
   targetFeedCount: 3, // Syncs with active schedule count
-  selectedMelody: 1,  // 1: Happy, 2: Gentle, 3: Beep
+  selectedMelody: 1,  // 1: Happy (~10s), 2: Gentle (~10s)
   isFeeding: false,
   lastResetDay: new Date().getDate(),
 
@@ -15,11 +15,12 @@ const state = {
   foodPercent: 80,
   isFoodLowWarning: false,
 
-  // PIR Meal Tracking State
+  // IR Pet Detection & 5-min Counter State
   continuousMotionSec: 0,
   noMotionSec: 0,
   isPirActive: false,
-  mealStatusStr: 'READY', // 'READY', 'EATING', 'SKIPPED'
+  mealStatusStr: 'READY', // 'READY', '12s/300s', 'EATING', 'SKIPPED'
+  motionTimerInterval: null,
 
   // Web BLE Connection State
   bleDevice: null,
@@ -123,9 +124,7 @@ function sendBLECommand(cmdStr) {
 function handleBLENotification(event) {
   const decoder = new TextDecoder('utf-8');
   const msg = decoder.decode(event.target.value).trim();
-  console.log('Received from ESP32:', msg);
 
-  // Parse incoming data format (e.g., "FOOD:75", "MEAL:EATING", "PIR:1")
   if (msg.startsWith('FOOD:')) {
     const pct = parseInt(msg.replace('FOOD:', ''));
     if (!isNaN(pct)) {
@@ -143,11 +142,12 @@ function handleBLENotification(event) {
 }
 
 // --------------------------------------------------------------------------
-// Sound Engine (Web Audio API Synthesizer)
+// Sound Engine (~10 Second Pet Melodies Simulation)
 // --------------------------------------------------------------------------
 const NOTE_FREQS = {
   C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00,
-  A4: 440.00, B4: 493.88, C5: 523.25, E5: 659.25, G5: 783.99
+  A4: 440.00, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25,
+  F5: 698.46, G5: 783.99, A5: 880.00
 };
 
 function playTone(freq, durationMs, delayMs = 0) {
@@ -157,10 +157,10 @@ function playTone(freq, durationMs, delayMs = 0) {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
 
-      osc.type = 'square';
+      osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
 
-      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (durationMs / 1000));
 
       osc.connect(gain);
@@ -175,27 +175,33 @@ function playTone(freq, durationMs, delayMs = 0) {
 }
 
 function playMelody(melodyId) {
-  if (melodyId === 1) {
-    const notes = [NOTE_FREQS.C4, NOTE_FREQS.E4, NOTE_FREQS.G4, NOTE_FREQS.C5, NOTE_FREQS.E5, NOTE_FREQS.G5];
-    const times = [100, 100, 100, 120, 120, 250];
-    let totalDelay = 0;
-    notes.forEach((freq, idx) => {
-      playTone(freq, times[idx], totalDelay);
-      totalDelay += times[idx] * 1.2;
+  if (melodyId === 1) { // 1번 멜로디 (~10초)
+    const melody = [
+      { f: NOTE_FREQS.C5, d: 300 }, { f: NOTE_FREQS.E5, d: 300 }, { f: NOTE_FREQS.G5, d: 300 }, { f: NOTE_FREQS.C5, d: 500 },
+      { f: NOTE_FREQS.G4, d: 300 }, { f: NOTE_FREQS.A4, d: 300 }, { f: NOTE_FREQS.C5, d: 300 }, { f: NOTE_FREQS.E5, d: 500 },
+      { f: NOTE_FREQS.G5, d: 400 }, { f: NOTE_FREQS.E5, d: 400 }, { f: NOTE_FREQS.C5, d: 400 }, { f: NOTE_FREQS.G4, d: 600 },
+      { f: NOTE_FREQS.C5, d: 300 }, { f: NOTE_FREQS.D5, d: 300 }, { f: NOTE_FREQS.E5, d: 300 }, { f: NOTE_FREQS.F5, d: 300 },
+      { f: NOTE_FREQS.G5, d: 600 }, { f: NOTE_FREQS.C5, d: 400 }, { f: NOTE_FREQS.E5, d: 400 }, { f: NOTE_FREQS.G5, d: 800 }
+    ];
+    let delay = 0;
+    melody.forEach(item => {
+      playTone(item.f, item.d, delay);
+      delay += item.d + 80;
     });
   } 
-  else if (melodyId === 2) {
-    const notes = [NOTE_FREQS.E4, NOTE_FREQS.G4, NOTE_FREQS.B4, NOTE_FREQS.E5];
-    const times = [150, 150, 150, 300];
-    let totalDelay = 0;
-    notes.forEach((freq, idx) => {
-      playTone(freq, times[idx], totalDelay);
-      totalDelay += times[idx] * 1.3;
+  else { // 2번 멜로디 (~10초)
+    const melody = [
+      { f: NOTE_FREQS.E5, d: 400 }, { f: NOTE_FREQS.G5, d: 400 }, { f: NOTE_FREQS.A5, d: 500 },
+      { f: NOTE_FREQS.G5, d: 400 }, { f: NOTE_FREQS.E5, d: 400 }, { f: NOTE_FREQS.C5, d: 600 },
+      { f: NOTE_FREQS.D5, d: 400 }, { f: NOTE_FREQS.E5, d: 400 }, { f: NOTE_FREQS.G5, d: 500 },
+      { f: NOTE_FREQS.E5, d: 400 }, { f: NOTE_FREQS.C5, d: 400 }, { f: NOTE_FREQS.A4, d: 600 },
+      { f: NOTE_FREQS.C5, d: 400 }, { f: NOTE_FREQS.E5, d: 400 }, { f: NOTE_FREQS.G5, d: 500 }, { f: NOTE_FREQS.C5, d: 800 }
+    ];
+    let delay = 0;
+    melody.forEach(item => {
+      playTone(item.f, item.d, delay);
+      delay += item.d + 100;
     });
-  } 
-  else {
-    playTone(NOTE_FREQS.C5, 120, 0);
-    playTone(NOTE_FREQS.G5, 200, 180);
   }
 }
 
@@ -218,13 +224,15 @@ function renderOLED() {
   ctx.fillStyle = '#090e1a';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Line 1: Title & Food %
   ctx.fillStyle = '#ffffff';
   ctx.font = '600 14px "Fira Code", monospace';
-  ctx.fillText('MAMAPET [STATUS]', 10, 20);
+  ctx.fillText('MAMAPET', 10, 20);
 
   ctx.fillStyle = state.foodPercent <= 20 ? '#ff4d4d' : '#ffffff';
   ctx.fillText(`${state.foodPercent}%`, 210, 20);
 
+  // Divider Line
   ctx.strokeStyle = '#38bdf8';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -232,24 +240,27 @@ function renderOLED() {
   ctx.lineTo(246, 26);
   ctx.stroke();
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '500 13px "Fira Code", monospace';
-  ctx.fillText(`FEED COUNT: ${state.todayFeedCount} / ${state.targetFeedCount}`, 10, 48);
-
+  // Line 2: Meal Status (Concise)
   ctx.fillStyle = '#60a5fa';
-  ctx.fillText(`MEAL: ${state.mealStatusStr}`, 10, 68);
+  ctx.font = '600 13px "Fira Code", monospace';
+  const shortMeal = state.mealStatusStr.includes('EATING') ? 'EATING' :
+                   (state.mealStatusStr.includes('SKIPPED') ? 'SKIPPED' : state.mealStatusStr);
+  ctx.fillText(`MEAL: ${shortMeal}`, 10, 52);
 
+  // Line 3: IR Sensor State
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '12px "Fira Code", monospace';
+  ctx.fillText(`IR  : ${state.isPirActive ? 'ON (DETECT)' : 'OFF'}`, 10, 75);
+
+  // Line 4: System Warning / Status
   if (state.foodPercent <= 20) {
     ctx.fillStyle = '#ef4444';
-    ctx.fillRect(10, 82, 236, 36);
+    ctx.fillRect(10, 88, 236, 32);
     ctx.fillStyle = '#ffffff';
-    ctx.font = '700 14px "Outfit", sans-serif';
-    ctx.fillText('⚠️ REFILL FOOD! (<=20%)', 35, 105);
+    ctx.font = '700 13px "Outfit", sans-serif';
+    ctx.fillText('⚠️ REFILL FOOD! (<=20%)', 40, 108);
   } else {
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '12px "Fira Code", monospace';
-    ctx.fillText(`PIR: ${state.isPirActive ? 'MOTION DETECTED' : 'NO MOTION'}`, 10, 92);
-    ctx.fillText('SYS: NORMAL READY', 10, 112);
+    ctx.fillText('SYS : ONLINE', 10, 108);
   }
 }
 
@@ -314,14 +325,14 @@ function updateUI() {
       v11Led.textContent = 'ON';
       v11Led.classList.add('active');
     }
-    if (pirStatusText) pirStatusText.textContent = '움직임 감지 중 (GPIO 27 HIGH)';
+    if (pirStatusText) pirStatusText.textContent = '반려동물 감지 중 (GPIO 27 LOW)';
     if (pirBadge) pirBadge.classList.add('active');
   } else {
     if (v11Led) {
       v11Led.textContent = 'OFF';
       v11Led.classList.remove('active');
     }
-    if (pirStatusText) pirStatusText.textContent = '움직임 없음 (GPIO 27 LOW)';
+    if (pirStatusText) pirStatusText.textContent = '미감지 (GPIO 27 HIGH)';
     if (pirBadge) pirBadge.classList.remove('active');
   }
 
@@ -347,6 +358,7 @@ function triggerFeeding() {
   if (servoHorn) servoHorn.style.transform = 'rotate(90deg)';
   if (servoAngle) servoAngle.textContent = '90° (사료 배출 중)';
 
+  // Play ~10 sec melody
   playMelody(parseInt(state.selectedMelody));
 
   if (bowlFill) bowlFill.style.height = '70%';
@@ -516,25 +528,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // PIR Pet Eat Button
+  // IR Pet Detection & 5-min Counter Simulation Button
   const btnSimPetEat = document.getElementById('btn-sim-pet-eat');
   if (btnSimPetEat) {
     btnSimPetEat.addEventListener('click', () => {
+      if (state.motionTimerInterval) clearInterval(state.motionTimerInterval);
+
       state.isPirActive = true;
-      state.mealStatusStr = 'EATING (식사 중)';
+      state.continuousMotionSec = 0;
       updateUI();
 
-      setTimeout(() => {
-        state.isPirActive = false;
+      state.motionTimerInterval = setInterval(() => {
+        state.continuousMotionSec += 15; // Speed up simulation by 15s steps
+        if (state.continuousMotionSec >= 300) {
+          state.mealStatusStr = 'EATING (식사 중)';
+          clearInterval(state.motionTimerInterval);
+          state.isPirActive = false;
+        } else {
+          state.mealStatusStr = `${state.continuousMotionSec}s/300s`;
+        }
         updateUI();
-      }, 3000);
+      }, 500);
     });
   }
 
-  // PIR Pet Skip Button
+  // IR Pet Skip Button
   const btnSimPetSkip = document.getElementById('btn-sim-pet-skip');
   if (btnSimPetSkip) {
     btnSimPetSkip.addEventListener('click', () => {
+      if (state.motionTimerInterval) clearInterval(state.motionTimerInterval);
       state.isPirActive = false;
       state.mealStatusStr = 'SKIPPED (미섭취/1시간 무반응)';
       updateUI();
@@ -546,6 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (melodySelect) {
     melodySelect.addEventListener('change', (e) => {
       state.selectedMelody = parseInt(e.target.value);
+      sendBLECommand(`MELODY:${state.selectedMelody}`);
     });
   }
 

@@ -20,7 +20,7 @@
       <div class="logo-icon"><i class="fa-solid fa-cat"></i></div>
       <div>
         <h1>MAMAPET <span>Smart Feeder IoT</span></h1>
-        <p class="subtitle">ESP32 MicroPython + Web BLE 무선 연동 + 초음파 사료 잔량 & PIR 감지</p>
+        <p class="subtitle">ESP32 MicroPython + 10초 펫 멜로디 + 5분 초 카운터 + Web BLE 무선 연동</p>
       </div>
     </div>
     <div class="header-status">
@@ -83,22 +83,22 @@
             </div>
           </div>
 
-          <!-- Bowl & PIR Sensor -->
+          <!-- Bowl & IR Sensor -->
           <div class="pet-bowl">
             <div class="bowl-inner" id="bowlFill"></div>
             <i class="fa-solid fa-bowl-food bowl-icon"></i>
           </div>
 
-          <!-- PIR Motion Sensor Sensor Indicator -->
+          <!-- IR Sensor Sensor Indicator -->
           <div class="pir-sensor-badge" id="pir-visualizer-badge">
-            <i class="fa-solid fa-person-walking"></i>
-            <span>PIR 센서: <strong id="pir-status-text">움직임 없음 (GPIO 27 LOW)</strong></span>
+            <i class="fa-solid fa-paw"></i>
+            <span>적외선(IR) 센서: <strong id="pir-status-text">미감지 (GPIO 27 HIGH)</strong></span>
           </div>
         </div>
 
         <div class="servo-status">
           <span>서보모터 위치: <strong id="servo-angle">0° (닫힘)</strong></span>
-          <span>식사 상태: <strong id="meal-tracker-state" class="badge-status">READY</strong></span>
+          <span>식사 판별 상태: <strong id="meal-tracker-state" class="badge-status">READY</strong></span>
         </div>
       </div>
     </section>
@@ -165,10 +165,10 @@
             <div class="multi-sched-list" id="sched-slots-container"></div>
           </div>
 
-          <!-- Widget V10 & V11: PIR Motion & Eating Monitoring -->
+          <!-- Widget V10 & V11: IR Motion & 5분 초 카운터 모니터링 -->
           <div class="blynk-widget pir-widget">
             <div class="widget-label">
-              <i class="fa-solid fa-shield-cat"></i> PIR 감지 활동 모니터링 (V10 & V11)
+              <i class="fa-solid fa-shield-cat"></i> IR 적외선 감지 & 5분 초 카운터 (V10 & V11)
             </div>
             <div class="pir-status-row">
               <div class="meal-result-box" id="v10-meal-box">
@@ -176,14 +176,14 @@
                 <span class="box-value" id="v10-status-text">READY</span>
               </div>
               <div class="pir-led-box">
-                <span class="box-title">PIR 실시간 (V11)</span>
+                <span class="box-title">IR 실시간 (V11)</span>
                 <div class="led-indicator" id="v11-led">OFF</div>
               </div>
             </div>
 
             <div class="pir-sim-controls">
               <button class="btn-pir-trigger" id="btn-sim-pet-eat">
-                <i class="fa-solid fa-paw"></i> 🐾 5분 이상 감지 (식사 중 변경)
+                <i class="fa-solid fa-paw"></i> 🐾 반려동물 접근 (5분 초 카운팅 시작)
               </button>
               <button class="btn-pir-skip" id="btn-sim-pet-skip">
                 <i class="fa-solid fa-triangle-exclamation"></i> ⚠️ 1시간 무반응 (미섭취 설정)
@@ -202,15 +202,14 @@
             </button>
           </div>
 
-          <!-- Widget V4: Buzzer Melody Selector -->
+          <!-- Widget V4: 10초 펫 멜로디 선택기 -->
           <div class="blynk-widget melody-widget">
             <div class="widget-label">
-              <i class="fa-solid fa-music"></i> 부저 멜로디 선택기 (Datastream V4)
+              <i class="fa-solid fa-music"></i> 강아지/고양이 10초 멜로디 선택기 (V4)
             </div>
             <select id="melody-select" class="styled-select">
-              <option value="1">🎵 멜로디 1: 경쾌한 알림음 (Happy Fanfare)</option>
-              <option value="2">🎶 멜로디 2: 부드러운 알림음 (Gentle Chime)</option>
-              <option value="3">🔔 멜로디 3: 단음 알림 (Short Beep)</option>
+              <option value="1">🎵 멜로디 1: 신나는 펫 식사 멜로디 (~10초)</option>
+              <option value="2">🎶 멜로디 2: 다정한 펫 오르골 멜로디 (~10초)</option>
             </select>
             <button class="btn-preview-sound" id="btn-test-melody">
               <i class="fa-solid fa-volume-high"></i> 소리 미리듣기
@@ -243,7 +242,7 @@
     <!-- Tab 1: ESP32 MicroPython Code Viewer -->
     <div class="tab-content active" id="tab-code">
       <div class="code-header">
-        <span>파일: <code>main.py</code> (ESP32 MicroPython + Web BLE 무선 연동)</span>
+        <span>파일: <code>main.py</code> (10초 멜로디 + 5분 초 카운터 + Web BLE)</span>
         <button class="btn-copy" id="btn-copy-code"><i class="fa-regular fa-copy"></i> 전체 코드 복사</button>
       </div>
       <pre><code id="code-display">/* Loading Source Code... */</code></pre>
@@ -268,7 +267,7 @@
                 <td><strong>OLED Display</strong></td>
                 <td><code class="pin-badge">SDA: 21</code>, <code class="pin-badge">SCL: 22</code></td>
                 <td>3.3V / I2C (0x3C)</td>
-                <td>0.96인치 128x64 SSD1306 화면 출력</td>
+                <td>0.96인치 128x64 SSD1306 간결 화면 출력</td>
               </tr>
               <tr>
                 <td><strong>서보모터 (SG90)</strong></td>
@@ -280,13 +279,13 @@
                 <td><strong>수동 부저 (Buzzer)</strong></td>
                 <td><code class="pin-badge">PWM: GPIO 19</code></td>
                 <td>3.3V ~ 5V / PWM</td>
-                <td>급식 시 3가지 알림 멜로디 출력</td>
+                <td>급식 시 약 10초 펫 멜로디 재생</td>
               </tr>
               <tr>
-                <td><strong>PIR 감지 센서</strong></td>
+                <td><strong>적외선(IR) 감지 센서</strong></td>
                 <td><code class="pin-badge">IN: GPIO 27</code></td>
-                <td>3.3V ~ 5V / Digital IN</td>
-                <td>급식구 앞 5분 감지(식사 중) / 1시간 무반응(미섭취)</td>
+                <td>5V (VIN) / Digital IN</td>
+                <td>반려동물 감지 시 5분(300초) 실시간 초 카운팅</td>
               </tr>
               <tr>
                 <td><strong>초음파 센서 (HC-SR04)</strong></td>
@@ -322,12 +321,12 @@
               <tr>
                 <td><strong>Rx (수신)</strong></td>
                 <td><code class="pin-badge">6e400002-...</code></td>
-                <td>웹 사이트 ➔ ESP32 제어 명령 전송 ("FEED", "MELODY:1")</td>
+                <td>웹 사이트 ➔ ESP32 제어 명령 전송 ("FEED", "MELODY:1", "MELODY:2")</td>
               </tr>
               <tr>
                 <td><strong>Tx (송신)</strong></td>
                 <td><code class="pin-badge">6e400003-...</code></td>
-                <td>ESP32 ➔ 웹 사이트 실시간 센서 수치 송신 ("FOOD:80,MEAL:ATE")</td>
+                <td>ESP32 ➔ 웹 사이트 실시간 센서 수치 송신 ("FOOD:80,MEAL:12s/300s")</td>
               </tr>
             </tbody>
           </table>
